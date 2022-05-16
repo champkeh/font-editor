@@ -1,13 +1,13 @@
-import fs from 'node:fs'
 import type {PathLike} from 'node:fs'
-import type {Buffer} from 'node:buffer'
-import type {ParsedFont, OffsetSubTable, DirectoryEntry} from '../types/ParsedFont'
+import fs from 'node:fs'
+import {DirectoryEntry} from "../types/ParsedFont";
+
 
 /**
  * 读取文件内容
  * @param path
  */
-export function readFile(path: PathLike | number): Promise<Buffer> {
+export function readFileContent(path: PathLike | number): Promise<Buffer> {
     return new Promise((resolve, reject) => {
         try {
             const buf = fs.readFileSync(path)
@@ -18,64 +18,50 @@ export function readFile(path: PathLike | number): Promise<Buffer> {
     })
 }
 
-/**
- * 解析ttf字体
- * @param data 字体文件内容
- */
-export function parseTtf(data: Buffer): ParsedFont {
-    let fileOffset = 0
+const FileOffset = {
+    value: 0,
+}
 
-    const scalerType = data.readUInt32BE(fileOffset)
-    if (scalerType !== 0x00010000 && scalerType !== 0x74727565) {
-        throw new Error('该字体不是ttf字体')
-    }
-    fileOffset += 4
+export function resetFileOffset() {
+    FileOffset.value = 0
+}
 
-    const numTables = data.readUInt16BE(fileOffset)
-    fileOffset += 2
+export function getFileOffset() {
+    return FileOffset.value
+}
 
-    const searchRange = data.readUInt16BE(fileOffset)
-    fileOffset += 2
+export function readUInt32BE(data: Buffer): number {
+    const value = data.readUInt32BE(FileOffset.value)
+    FileOffset.value += 4
+    return value
+}
 
-    const entrySelector = data.readUInt16BE(fileOffset)
-    fileOffset += 2
+export function readUInt16BE(data: Buffer): number {
+    const value = data.readUInt16BE(FileOffset.value)
+    FileOffset.value += 2
+    return value
+}
 
-    const rangeShift = data.readUInt16BE(fileOffset)
-    fileOffset += 2
+export function readInt16BE(data: Buffer): number {
+    const value = data.readInt16BE(FileOffset.value)
+    FileOffset.value += 2
+    return value
+}
 
-    const offset: OffsetSubTable = {
-        scalerType,
-        numTables,
-        searchRange,
-        entrySelector,
-        rangeShift,
-        _blockSize: fileOffset,
-    }
-    const directory: DirectoryEntry[] = []
+export function readBigInt64BE(data: Buffer): number {
+    const value = data.readBigInt64BE(FileOffset.value)
+    FileOffset.value += 8
+    return Number(value)
+}
 
-    // table directory
-    for (let i = 0; i < numTables; i++) {
-        let blockStart = fileOffset
-        const tag = data.slice(fileOffset, fileOffset + 4).toString("ascii")
-        fileOffset += 4
-        const checksum = data.readUInt32BE(fileOffset)
-        fileOffset += 4
-        const offset = data.readUInt32BE(fileOffset)
-        fileOffset += 4
-        const length = data.readUInt32BE(fileOffset)
-        fileOffset += 4
-        directory.push({
-            tag,
-            checksum,
-            offset,
-            length,
-            _blockSize: fileOffset - blockStart,
-            _pad: (4 - (length % 4)) % 4,
-        })
-    }
+export function readBuffer(data: Buffer, len: number): Buffer {
+    const buf = data.slice(FileOffset.value, FileOffset.value + len)
+    FileOffset.value += len
+    return buf
+}
 
-    return {
-        offset,
-        directory,
+export function checkFileOffset(table: DirectoryEntry) {
+    if (FileOffset.value !== table.offset) {
+        throw new Error(`解析'${table.tag}'表时文件偏移不正确！\n\n期望偏移:${table.offset}, 实际偏移:${FileOffset.value}`)
     }
 }
