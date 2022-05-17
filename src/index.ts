@@ -1,5 +1,4 @@
 import {
-    resetFileOffset,
     readUInt16BE,
     readInt16BE,
     readUInt32BE,
@@ -7,14 +6,14 @@ import {
     getFileOffset,
     readLongDateTime,
     readFWord,
-    parseNameString,
-    setFileOffset
+    setFileOffset,
+    parseNameStringInPlace
 } from './utils'
 import {
-    DirectoryEntry, DirectoryOffsetSubTable, DirectoryTable, GlyfDef, GlyfTable,
+    DirectoryEntry, DirectoryOffsetSubTable, DirectoryTable, GlyfTable,
     HeadTable,
     HheaTable, HmtxTable,
-    LocaTable, LongHorMetric,
+    LocaTable,
     MaxpTable, NameRecord, NameTable,
     ParsedFont,
     Tables, TableTagNameMap
@@ -357,14 +356,14 @@ function parseNameTable(file: Buffer, currentTable: DirectoryEntry, tables: Tabl
     const nameRecord: NameRecord[] = []
     for (let i = 0; i < count; i++) {
         const platformID = readUInt16BE(file)
-        const platformSpecificID = readUInt16BE(file)
+        const encodingID = readUInt16BE(file)
         const languageID = readUInt16BE(file)
         const nameID = readUInt16BE(file)
         const length = readUInt16BE(file)
         const offset = readUInt16BE(file)
         nameRecord.push({
             platformID,
-            platformSpecificID,
+            encodingID,
             languageID,
             nameID,
             length,
@@ -382,9 +381,7 @@ function parseNameTable(file: Buffer, currentTable: DirectoryEntry, tables: Tabl
 
         setFileOffset(currentTable.offset + stringOffset + record.offset)
         const nameBuf = readBuffer(file, record.length)
-        const parsedRes = parseNameString(nameBuf, record)
-        record._name = parsedRes[0]
-        record._desc = parsedRes[1]
+        parseNameStringInPlace(nameBuf, record)
     }
 
     return {

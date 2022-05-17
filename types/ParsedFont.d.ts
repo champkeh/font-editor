@@ -114,14 +114,17 @@ export interface HmtxTable {
 
 export interface NameRecord {
     platformID: number
-    platformSpecificID: number
+    encodingID: number
     languageID: number
     nameID: number
     length: number
     offset: number
     _index: number
+    _platform?: string
+    _encoding?: string
+    _language?: string
     _name?: string
-    _desc?: string
+    _value?: string
 }
 export interface NameTable {
     format: number
