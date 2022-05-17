@@ -1,6 +1,6 @@
 import * as Buffer from "buffer";
 
-export interface OffsetSubTable {
+export interface DirectoryOffsetSubTable {
     scalerType: number
     numTables: number
     searchRange: number
@@ -10,7 +10,7 @@ export interface OffsetSubTable {
 }
 
 export interface DirectoryEntry {
-    tag: string
+    tag: keyof TableTagNameMap
     checksum: number
     offset: number
     length: number
@@ -27,12 +27,19 @@ interface TableTagNameMap {
     "head": HeadTable
     "maxp": MaxpTable
     "loca": LocaTable
+    "hmtx": HmtxTable
+    "name": NameTable
+    "glyf": GlyfTable
 }
 
 export interface ParsedFont {
-    offset: OffsetSubTable
-    directory: DirectoryEntry[]
+    directory: DirectoryTable
     tables: Tables
+}
+
+export interface DirectoryTable {
+    offset: OffsetSubTable
+    entries: DirectoryEntry[]
 }
 
 export interface HheaTable {
@@ -95,3 +102,49 @@ export type LocaTable = {
     _length: number
     _index: number
 }[]
+
+export interface LongHorMetric {
+    advanceWidth: number
+    leftSideBearing: number
+}
+export interface HmtxTable {
+    hMetrics: LongHorMetric[]
+    leftSideBearing?: number[]
+}
+
+export interface NameRecord {
+    platformID: number
+    platformSpecificID: number
+    languageID: number
+    nameID: number
+    length: number
+    offset: number
+    _index: number
+    _name?: string
+    _desc?: string
+}
+export interface NameTable {
+    format: number
+    count: number
+    stringOffset: number
+    nameRecord: NameRecord[]
+}
+
+export interface EmptyGlyfDef {
+    _index: number
+    _length: 0
+}
+export interface NotEmptyGlyfDef {
+    numberOfContours: number
+    xMin: number
+    yMin: number
+    xMax: number
+    yMax: number
+    data: Buffer
+    _index: number
+    _length: number
+    _kind: 'simple' | 'compound'
+}
+export type GlyfDef = EmptyGlyfDef | NotEmptyGlyfDef
+
+export type GlyfTable = GlyfDef[]
