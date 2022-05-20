@@ -1,5 +1,3 @@
-import * as Buffer from "buffer";
-
 export interface DirectoryOffsetSubTable {
     scalerType: number
     numTables: number
@@ -22,6 +20,10 @@ export type Tables = {
     [tag in keyof TableTagNameMap]?: TableTagNameMap[tag]
 }
 
+interface BaseTable {
+    _parsed: boolean
+}
+
 interface TableTagNameMap {
     "hhea": HheaTable
     "head": HeadTable
@@ -30,6 +32,7 @@ interface TableTagNameMap {
     "hmtx": HmtxTable
     "name": NameTable
     "glyf": GlyfTable
+    "cmap": CmapTable
 }
 
 export interface ParsedFont {
@@ -42,7 +45,7 @@ export interface DirectoryTable {
     entries: DirectoryEntry[]
 }
 
-export interface HheaTable {
+export interface HheaTable extends BaseTable {
     version: string
     ascent: number
     descent: number
@@ -59,7 +62,7 @@ export interface HheaTable {
     numOfLongHorMetrics: number
 }
 
-export interface HeadTable {
+export interface HeadTable extends BaseTable {
     version: string
     fontRevision: string
     checkSumAdjustment: number
@@ -79,7 +82,7 @@ export interface HeadTable {
     glyphDataFormat: number
 }
 
-export interface MaxpTable {
+export interface MaxpTable extends BaseTable {
     version: string
     numGlyphs: number
     maxPoints: number
@@ -97,17 +100,20 @@ export interface MaxpTable {
     maxComponentDepth: number
 }
 
-export type LocaTable = {
+export interface LocaEntry {
     offset: number
     _length: number
     _index: number
-}[]
+}
+export interface LocaTable extends BaseTable {
+    entries: LocaEntry[]
+}
 
 export interface LongHorMetric {
     advanceWidth: number
     leftSideBearing: number
 }
-export interface HmtxTable {
+export interface HmtxTable extends BaseTable {
     hMetrics: LongHorMetric[]
     leftSideBearing?: number[]
 }
@@ -126,7 +132,7 @@ export interface NameRecord {
     _name?: string
     _value?: string
 }
-export interface NameTable {
+export interface NameTable extends BaseTable {
     format: number
     count: number
     stringOffset: number
@@ -143,11 +149,92 @@ export interface NotEmptyGlyfDef {
     yMin: number
     xMax: number
     yMax: number
-    data: Buffer
+    data: SimpleGlyfData | CompoundGlyfData
     _index: number
     _length: number
     _kind: 'simple' | 'compound'
 }
 export type GlyfDef = EmptyGlyfDef | NotEmptyGlyfDef
 
-export type GlyfTable = GlyfDef[]
+export interface SimpleGlyfData {
+    endPtsOfContours: number[]
+    instructionLength: number
+    instructions: Buffer
+    // flags: number[]
+    // xCoordinates: number[]
+    // yCoordinates: number[]
+    remind: Buffer
+}
+export type CompoundGlyfData = Buffer
+
+export interface GlyfTable extends BaseTable {
+    entries: GlyfDef[]
+}
+export interface GlyfFlag {
+    onCurve?: boolean
+    xShortVector?: boolean
+    yShortVector?: boolean
+    repeat?: boolean
+    xSame?: boolean
+    ySame?: boolean
+    _index: number
+    _bits: string
+    _repeat?: number
+    _copy?: boolean
+}
+
+export interface CmapEncodingSubtable {
+    platformID: number
+    encodingID: number
+    offset: number
+    _platform?: string
+    _encoding?: string
+    format?: number
+    _data?: CmapFormat0 | CmapFormat2 | CmapFormat4 | CmapFormat12
+}
+export interface CmapTable extends BaseTable {
+    version: number
+    numberSubtables: number
+    subtables: CmapEncodingSubtable[]
+    _preferSubtable?: number
+}
+interface IGetGlyphIndex {
+    getGlyphIndex(code: number): number
+}
+export interface CmapFormat0 extends IGetGlyphIndex{
+    format: 0
+    length: number
+    language: number
+    glyphIndexArray: number[256]
+}
+export interface CmapFormat2 extends IGetGlyphIndex {
+    format: 2
+}
+export interface CmapFormat4 extends IGetGlyphIndex {
+    format: 4
+    length: number
+    language: number
+    segCountX2: number
+    searchRange: number
+    entrySelector: number
+    rangeShift: number
+    endCode: number[]
+    reservedPad: number
+    startCode: number[]
+    idDelta: number[]
+    idRangeOffset: number[]
+}
+
+export interface CmapFormat12Group {
+    startCharCode: number
+    endCharCode: number
+    startGlyphCode: number
+}
+export interface CmapFormat12 extends IGetGlyphIndex {
+    format: 12
+    reserved: number
+    length: number
+    language: number
+    nGroups: number
+    groups: CmapFormat12Group[]
+}

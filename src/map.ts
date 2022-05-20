@@ -9,7 +9,9 @@ export const UnicodeEncodingIDMap: Record<number, string> = {
     1: 'Unicode 1.1',
     2: 'ISO/IEC 10646',
     3: 'Unicode 2.0 (BMP only)',
-    4: 'Unicode 2.0 (full)',
+    4: 'Unicode 2.0 (UCS-4)',
+    5: 'Unicode Variation Sequences',
+    6: 'Last Resort'
 }
 
 export const MacintoshEncodingIDMap: Record<number, string> = {
@@ -171,7 +173,7 @@ export const MacintoshLanguageIDMap: Record<number, string> = {
 
 export const WindowsEncodingIDMap: Record<number, string> = {
     0: 'Symbol',
-    1: 'Unicode BMP',
+    1: 'Unicode BMP (BMP only)',
     2: 'ShiftJIS',
     3: 'PRC',
     4: 'Big5',
@@ -180,7 +182,7 @@ export const WindowsEncodingIDMap: Record<number, string> = {
     7: 'Reserved',
     8: 'Reserved',
     9: 'Reserved',
-    10: 'Unicode full repertoire',
+    10: 'Unicode full (UCS-4)',
 }
 
 export const WindowsLanguageIDMap: Record<string, string> = {

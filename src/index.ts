@@ -7,12 +7,16 @@ import {
     readLongDateTime,
     readFWord,
     setFileOffset,
-    parseNameStringInPlace
+    parseNameStringInPlace,
+    parseGlyfData,
+    parseCmapSubtablesInPlace
 } from './utils'
 import {
-    DirectoryEntry, DirectoryOffsetSubTable, DirectoryTable, GlyfTable,
+    CmapEncodingSubtable,
+    CmapTable,
+    DirectoryEntry, DirectoryOffsetSubTable, DirectoryTable, GlyfDef, GlyfTable,
     HeadTable,
-    HheaTable, HmtxTable,
+    HheaTable, HmtxTable, LocaEntry,
     LocaTable,
     MaxpTable, NameRecord, NameTable,
     ParsedFont,
@@ -28,8 +32,8 @@ export function parseTtf(file: Buffer): ParsedFont {
     // directory table
     const directory = parseDirectoryTable(file)
 
-    // table data
-    const tables = parseTableData(file, directory.entries)
+    // data table
+    const tables = parseDataTable(file, directory.entries)
 
     return {
         directory,
@@ -111,31 +115,27 @@ function parseDirectoryEntries(file: Buffer, numTables: number): DirectoryEntry[
  * @param file 字体文件数据
  * @param directory 表目录
  */
-function parseTableData(file: Buffer, directory: DirectoryEntry[]): Tables {
-    // 对 directory 排序
-    directory.sort((a, b) => a.offset > b.offset ? 1 : -1)
-
+function parseDataTable(file: Buffer, directory: DirectoryEntry[]): Tables {
     const tables: Tables = {}
+
     for (let i = 0; i < directory.length; i++) {
-        const currentTable = directory[i]
-
-        // 将文件指针指向要解析的表偏移
-        setFileOffset(currentTable.offset)
-
-        if (currentTable.tag === 'hhea') {
-            tables.hhea = parseHheaTable(file, currentTable, tables)
-        } else if (currentTable.tag === 'head') {
-            tables.head = parseHeadTable(file, currentTable, tables)
-        } else if (currentTable.tag === 'maxp') {
-            tables.maxp = parseMaxpTable(file, currentTable, tables)
-        } else if (currentTable.tag === 'loca') {
-            tables.loca = parseLocaTable(file, currentTable, tables)
-        } else if (currentTable.tag === "hmtx") {
-            tables.hmtx = parseHmtxTable(file, currentTable, tables)
-        } else if (currentTable.tag === "name") {
-            tables.name = parseNameTable(file, currentTable, tables)
-        } else if (currentTable.tag === "glyf") {
-            tables.glyf = parseGlyfTable(file, currentTable, tables)
+        const tableDesc = directory[i]
+        if (tableDesc.tag === 'hhea') {
+            tables.hhea = parseHheaTable(file, directory, tables)
+        } else if (tableDesc.tag === 'head') {
+            tables.head = parseHeadTable(file, directory, tables)
+        } else if (tableDesc.tag === 'maxp') {
+            tables.maxp = parseMaxpTable(file, directory, tables)
+        } else if (tableDesc.tag === 'loca') {
+            tables.loca = parseLocaTable(file, directory, tables)
+        } else if (tableDesc.tag === "hmtx") {
+            tables.hmtx = parseHmtxTable(file, directory, tables)
+        } else if (tableDesc.tag === "name") {
+            tables.name = parseNameTable(file, directory, tables)
+        } else if (tableDesc.tag === "glyf") {
+            tables.glyf = parseGlyfTable(file, directory, tables)
+        } else if (tableDesc.tag === "cmap") {
+            tables.cmap = parseCmapTable(file, directory, tables)
         }
     }
 
@@ -145,10 +145,18 @@ function parseTableData(file: Buffer, directory: DirectoryEntry[]): Tables {
 /**
  * 解析 'hhea' 表
  * @param file 字体数据
- * @param currentTable 当前表的元数据
+ * @param directory 表目录
  * @param tables 已解析的tables
  */
-function parseHheaTable(file: Buffer, currentTable: DirectoryEntry, tables: Tables): HheaTable {
+function parseHheaTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): HheaTable {
+    const tableDesc = directory.find(table => table.tag === 'hhea')
+    if (!tableDesc) {
+        throw new Error(`'hhea' 表不存在`)
+    }
+
+    // 将文件指针指向要解析的表偏移
+    setFileOffset(tableDesc.offset)
+
     const major = readInt16BE(file)
     const minor = readInt16BE(file)
     const version = `${major}.${minor}`
@@ -168,6 +176,7 @@ function parseHheaTable(file: Buffer, currentTable: DirectoryEntry, tables: Tabl
     const numOfLongHorMetrics = readUInt16BE(file)
 
     return {
+        _parsed: true,
         version,
         ascent,
         descent,
@@ -188,10 +197,18 @@ function parseHheaTable(file: Buffer, currentTable: DirectoryEntry, tables: Tabl
 /**
  * 解析 'head' 表
  * @param file 字体数据
- * @param currentTable 当前表的元数据
+ * @param directory 表目录
  * @param tables 已解析的tables
  */
-function parseHeadTable(file: Buffer, currentTable: DirectoryEntry, tables: Tables): HeadTable {
+function parseHeadTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): HeadTable {
+    const tableDesc = directory.find(table => table.tag === 'head')
+    if (!tableDesc) {
+        throw new Error(`'head' 表不存在`)
+    }
+
+    // 将文件指针指向要解析的表偏移
+    setFileOffset(tableDesc.offset)
+
     const versionMajor = readInt16BE(file)
     const versionMinor = readInt16BE(file)
     const version = `${versionMajor}.${versionMinor}`
@@ -217,6 +234,7 @@ function parseHeadTable(file: Buffer, currentTable: DirectoryEntry, tables: Tabl
     const glyphDataFormat = readInt16BE(file)
 
     return {
+        _parsed: true,
         version,
         fontRevision,
         checkSumAdjustment,
@@ -240,10 +258,18 @@ function parseHeadTable(file: Buffer, currentTable: DirectoryEntry, tables: Tabl
 /**
  * 解析 'maxp' 表
  * @param file 字体数据
- * @param currentTable 当前表的元数据
+ * @param directory 表目录
  * @param tables 已解析的tables
  */
-function parseMaxpTable(file: Buffer, currentTable: DirectoryEntry, tables: Tables): MaxpTable {
+function parseMaxpTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): MaxpTable {
+    const tableDesc = directory.find(table => table.tag === 'maxp')
+    if (!tableDesc) {
+        throw new Error(`'maxp' 表不存在`)
+    }
+
+    // 将文件指针指向要解析的表偏移
+    setFileOffset(tableDesc.offset)
+
     const major = readInt16BE(file)
     const minor = readInt16BE(file)
     const version = `${major}.${minor}`
@@ -264,6 +290,7 @@ function parseMaxpTable(file: Buffer, currentTable: DirectoryEntry, tables: Tabl
     const maxComponentDepth = readUInt16BE(file)
 
     return {
+        _parsed: true,
         version,
         numGlyphs,
         maxPoints,
@@ -285,17 +312,33 @@ function parseMaxpTable(file: Buffer, currentTable: DirectoryEntry, tables: Tabl
 /**
  * 解析 'loca' 表
  * @param file 字体数据
- * @param currentTable 当前表的元数据
+ * @param directory 表目录
  * @param tables 已解析的tables
  */
-function parseLocaTable(file: Buffer, currentTable: DirectoryEntry, tables: Tables): LocaTable {
-    const locas: LocaTable = []
+function parseLocaTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): LocaTable {
+    const tableDesc = directory.find(table => table.tag === 'loca')
+    if (!tableDesc) {
+        throw new Error(`'loca' 表不存在`)
+    }
+
+    // 确保 loca 表所依赖的表先进行解析
+    if (!tables.maxp || !tables.maxp._parsed) {
+        tables.maxp = parseMaxpTable(file, directory, tables)
+    }
+    if (!tables.head || !tables.head._parsed) {
+        tables.head = parseHeadTable(file, directory, tables)
+    }
+
+    // 将文件指针指向要解析的表偏移
+    setFileOffset(tableDesc.offset)
+
+    const locas: LocaEntry[] = []
 
     let previousGlyphsOffset = 0
-    const numGlyphs = tables.maxp!.numGlyphs!
+    const numGlyphs = tables.maxp.numGlyphs
     for (let i = 0; i < numGlyphs + 1; i++) {
         let currentGlyphsOffset = 0
-        if (tables.head!.indexToLocFormat === 'short') {
+        if (tables.head.indexToLocFormat === 'short') {
             currentGlyphsOffset = readUInt16BE(file) * 2
         } else {
             currentGlyphsOffset = readUInt32BE(file)
@@ -310,19 +353,36 @@ function parseLocaTable(file: Buffer, currentTable: DirectoryEntry, tables: Tabl
         }
         previousGlyphsOffset = currentGlyphsOffset
     }
-    return locas
+    return {
+        _parsed: true,
+        entries: locas,
+    }
 }
 
 /**
  * 解析 'hmtx' 表
  * @param file 字体数据
- * @param currentTable 当前表的元数据
+ * @param directory 表目录
  * @param tables 已解析的tables
  */
-function parseHmtxTable(file: Buffer, currentTable: DirectoryEntry, tables: Tables): HmtxTable {
-    const numOfLongHorMetrics = tables.hhea!.numOfLongHorMetrics
+function parseHmtxTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): HmtxTable {
+    const tableDesc = directory.find(table => table.tag === 'hmtx')
+    if (!tableDesc) {
+        throw new Error(`'hmtx' 表不存在`)
+    }
+
+    // 确保 hmtx 表所依赖的表先进行解析
+    if (!tables.hhea || !tables.hhea._parsed) {
+        tables.hhea = parseHheaTable(file, directory, tables)
+    }
+
+    // 将文件指针指向要解析的表偏移
+    setFileOffset(tableDesc.offset)
+
+    const numOfLongHorMetrics = tables.hhea.numOfLongHorMetrics
 
     const hmtxTable: HmtxTable = {
+        _parsed: false,
         hMetrics: []
     }
     for (let i = 0; i < numOfLongHorMetrics; i++) {
@@ -331,7 +391,7 @@ function parseHmtxTable(file: Buffer, currentTable: DirectoryEntry, tables: Tabl
         hmtxTable.hMetrics.push({advanceWidth, leftSideBearing})
     }
 
-    const numOfLeftSideBearing = (currentTable.length - numOfLongHorMetrics * 4) / 2
+    const numOfLeftSideBearing = (tableDesc.length - numOfLongHorMetrics * 4) / 2
     if (numOfLeftSideBearing > 0) {
         hmtxTable.leftSideBearing = []
         for (let i = 0; i < numOfLeftSideBearing; i++) {
@@ -339,16 +399,25 @@ function parseHmtxTable(file: Buffer, currentTable: DirectoryEntry, tables: Tabl
         }
     }
 
+    hmtxTable._parsed = true
     return hmtxTable
 }
 
 /**
  * 解析 'name' 表
  * @param file 字体数据
- * @param currentTable 当前表的元数据
+ * @param directory 表目录
  * @param tables 已解析的tables
  */
-function parseNameTable(file: Buffer, currentTable: DirectoryEntry, tables: Tables): NameTable {
+function parseNameTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): NameTable {
+    const tableDesc = directory.find(table => table.tag === 'name')
+    if (!tableDesc) {
+        throw new Error(`'name' 表不存在`)
+    }
+
+    // 将文件指针指向要解析的表偏移
+    setFileOffset(tableDesc.offset)
+
     const format = readUInt16BE(file)
     const count = readUInt16BE(file)
     const stringOffset = readUInt16BE(file)
@@ -379,12 +448,13 @@ function parseNameTable(file: Buffer, currentTable: DirectoryEntry, tables: Tabl
     for (let i = 0; i < count; i++) {
         const record = nameRecord[i]
 
-        setFileOffset(currentTable.offset + stringOffset + record.offset)
+        setFileOffset(tableDesc.offset + stringOffset + record.offset)
         const nameBuf = readBuffer(file, record.length)
         parseNameStringInPlace(nameBuf, record)
     }
 
     return {
+        _parsed: true,
         format,
         count,
         stringOffset,
@@ -395,16 +465,30 @@ function parseNameTable(file: Buffer, currentTable: DirectoryEntry, tables: Tabl
 /**
  * 解析 'glyf' 表
  * @param file 字体数据
- * @param currentTable 当前表的元数据
+ * @param directory 表目录
  * @param tables 已解析的tables
  */
-function parseGlyfTable(file: Buffer, currentTable: DirectoryEntry, tables: Tables): GlyfTable {
-    tables.loca?.sort((a, b) => a._index > b._index ? 1 : -1)
+function parseGlyfTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): GlyfTable {
+    const tableDesc = directory.find(table => table.tag === 'glyf')
+    if (!tableDesc) {
+        throw new Error(`'glyf' 表不存在`)
+    }
 
-    const glyfTable: GlyfTable = []
-    tables.loca?.forEach(loca => {
+    // 确保 glyf 表所依赖的表先进行解析
+    if (!tables.loca || !tables.loca._parsed) {
+        tables.loca = parseLocaTable(file, directory, tables)
+    }
+
+    // 将文件指针指向要解析的表偏移
+    setFileOffset(tableDesc.offset)
+
+    tables.loca.entries.sort((a, b) => a._index > b._index ? 1 : -1)
+
+    const glyfDefs: GlyfDef[] = []
+    tables.loca.entries.forEach(loca => {
         if (loca._length === 0) {
-            glyfTable.push({
+            // 表示该位置的字型是缺失的
+            glyfDefs.push({
                 _index: loca._index,
                 _length: 0,
             })
@@ -415,9 +499,9 @@ function parseGlyfTable(file: Buffer, currentTable: DirectoryEntry, tables: Tabl
         const yMin = readFWord(file)
         const xMax = readFWord(file)
         const yMax = readFWord(file)
-        const buf = readBuffer(file, loca._length - 10)
-
-        glyfTable.push({
+        // const buf = readBuffer(file, loca._length - 10)
+        const buf = parseGlyfData(file, numberOfContours, loca._length - 10)
+        glyfDefs.push({
             numberOfContours,
             xMin,
             yMin,
@@ -430,5 +514,47 @@ function parseGlyfTable(file: Buffer, currentTable: DirectoryEntry, tables: Tabl
         })
     })
 
-    return glyfTable
+    return {
+        _parsed: true,
+        entries: glyfDefs,
+    }
+}
+
+/**
+ * 解析 'cmap' 表
+ * @param file 字体数据
+ * @param directory 表目录
+ * @param tables 已解析的tables
+ */
+function parseCmapTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): CmapTable {
+    const tableDesc = directory.find(table => table.tag === 'cmap')
+    if (!tableDesc) {
+        throw new Error(`'cmap' 表不存在`)
+    }
+
+    // 将文件指针指向要解析的表偏移
+    setFileOffset(tableDesc.offset)
+
+    const version = readUInt16BE(file)
+    const numberSubtables = readUInt16BE(file)
+
+    const subtables: CmapEncodingSubtable[] = []
+    for (let i = 0; i < numberSubtables; i++) {
+        const platformID = readUInt16BE(file)
+        const encodingID = readUInt16BE(file)
+        const offset = readUInt32BE(file)
+        subtables.push({
+            platformID,
+            encodingID,
+            offset,
+        })
+    }
+    parseCmapSubtablesInPlace(file, tableDesc, subtables)
+
+    return {
+        _parsed: true,
+        version,
+        numberSubtables,
+        subtables,
+    }
 }
