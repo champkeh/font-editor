@@ -41,7 +41,7 @@ export interface ParsedFont {
 }
 
 export interface DirectoryTable {
-    offset: OffsetSubTable
+    offset: DirectoryOffsetSubTable
     entries: DirectoryEntry[]
 }
 
@@ -57,7 +57,7 @@ export interface HheaTable extends BaseTable {
     caretSlopeRise: number
     caretSlopeRun: number
     caretOffset: number
-    reserved: Buffer
+    reserved: ArrayBuffer
     metricDataFormat: number
     numOfLongHorMetrics: number
 }
@@ -159,13 +159,13 @@ export type GlyfDef = EmptyGlyfDef | NotEmptyGlyfDef
 export interface SimpleGlyfData {
     endPtsOfContours: number[]
     instructionLength: number
-    instructions: Buffer
+    instructions: ArrayBuffer
     // flags: number[]
     // xCoordinates: number[]
     // yCoordinates: number[]
-    remind: Buffer
+    remind: ArrayBuffer
 }
-export type CompoundGlyfData = Buffer
+export type CompoundGlyfData = ArrayBuffer
 
 export interface GlyfTable extends BaseTable {
     entries: GlyfDef[]
@@ -205,7 +205,7 @@ export interface CmapFormat0 extends IGetGlyphIndex{
     format: 0
     length: number
     language: number
-    glyphIndexArray: number[256]
+    glyphIndexArray: number[]
 }
 export interface CmapFormat2 extends IGetGlyphIndex {
     format: 2

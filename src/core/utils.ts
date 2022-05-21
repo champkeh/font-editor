@@ -1,6 +1,3 @@
-import type {PathLike} from 'node:fs'
-import fs from 'node:fs'
-import moment from "moment"
 import {
     CmapEncodingSubtable, CmapFormat12Group,
     CompoundGlyfData,
@@ -8,7 +5,7 @@ import {
     GlyfFlag,
     NameRecord,
     SimpleGlyfData
-} from "../types/ParsedFont"
+} from "../../types/ParsedFont"
 import {
     UnicodeEncodingIDMap,
     MacintoshEncodingIDMap,
@@ -16,174 +13,15 @@ import {
     PlatformIDMap,
     WindowsLanguageIDMap, MacintoshLanguageIDMap, NameIDMap
 } from './map'
+import {IFileBuffer} from "../adapter/IFileBuffer";
 
-
-/**
- * 读取文件内容
- * @param path
- */
-export function readFileContent(path: PathLike | number): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-        try {
-            const buf = fs.readFileSync(path)
-            resolve(buf)
-        } catch (e) {
-            reject(e)
-        }
-    })
-}
-
-/**
- * 字体文件偏移对象
- */
-const FileOffset = {
-    value: 0,
-}
-
-/**
- * 设置文件偏移
- * @param offset 文件偏移
- */
-export function setFileOffset(offset: number) {
-    FileOffset.value = offset
-}
-
-/**
- * 重置文件偏移
- */
-export function resetFileOffset() {
-    setFileOffset(0)
-}
-
-/**
- * 获取当前文件偏移
- */
-export function getFileOffset() {
-    return FileOffset.value
-}
-
-/**
- * 从当前偏移处读取一个 int8 值
- * @param data 原始数据
- */
-export function readInt8(data: Buffer): number {
-    const value = data.readInt8(FileOffset.value)
-    FileOffset.value += 1
-    return value
-}
-
-/**
- * 从当前偏移处读取一个 uint8 值
- * @param data 原始数据
- */
-export function readUInt8(data: Buffer): number {
-    const value = data.readUInt8(FileOffset.value)
-    FileOffset.value += 1
-    return value
-}
-
-/**
- * 从当前偏移处读取一个 int16 值
- * @param data 原始数据
- */
-export function readInt16BE(data: Buffer): number {
-    const value = data.readInt16BE(FileOffset.value)
-    FileOffset.value += 2
-    return value
-}
-
-/**
- * 从当前偏移处读取一个 uint16 值
- * @param data 原始数据
- */
-export function readUInt16BE(data: Buffer): number {
-    const value = data.readUInt16BE(FileOffset.value)
-    FileOffset.value += 2
-    return value
-}
-
-/**
- * 从当前偏移处读取一个 int32 值
- * @param data 原始数据
- */
-export function readInt32BE(data: Buffer): number {
-    const value = data.readInt32BE(FileOffset.value)
-    FileOffset.value += 4
-    return value
-}
-
-/**
- * 从当前偏移处读取一个 uint32 值
- * @param data 原始数据
- */
-export function readUInt32BE(data: Buffer): number {
-    const value = data.readUInt32BE(FileOffset.value)
-    FileOffset.value += 4
-    return value
-}
-
-/**
- * 从当前偏移处读取一个 int64 值
- * @param data 原始数据
- */
-export function readBigInt64BE(data: Buffer): number {
-    const value = data.readBigInt64BE(FileOffset.value)
-    FileOffset.value += 8
-    return Number(value)
-}
-
-/**
- * 从当前偏移处读取一个 uint64 值
- * @param data 原始数据
- */
-export function readBigUInt64BE(data: Buffer): number {
-    const value = data.readBigUInt64BE(FileOffset.value)
-    FileOffset.value += 8
-    return Number(value)
-}
-
-/**
- * 从当前偏移处读取一个 FWord 值
- * @param data 原始数据
- */
-export function readFWord(data: Buffer): number {
-    return readInt16BE(data)
-}
-
-/**
- * 从当前偏移处读取一个 UFWord 值
- * @param data 原始数据
- */
-export function readUFWord(data: Buffer): number {
-    return readUInt16BE(data)
-}
-
-/**
- * 从当前偏移处读取指定长度的buf
- * @param data 原始数据
- * @param len 字节数
- */
-export function readBuffer(data: Buffer, len: number): Buffer {
-    const buf = data.slice(FileOffset.value, FileOffset.value + len)
-    FileOffset.value += len
-    return buf
-}
-
-/**
- * 从当前偏移处读取一个 LongDateTime 值
- * @param data 原始数据
- */
-export function readLongDateTime(data: Buffer): string {
-    const seconds = readBigInt64BE(data)
-    return moment("1904-01-01").add(seconds, 's').format()
-}
 
 /**
  * 解析 'name' 表中的 name 字符串
  * @param data
  * @param record
  */
-export function parseNameStringInPlace(data: Buffer, record: NameRecord) {
+export function parseNameStringInPlace(data: IFileBuffer, record: NameRecord) {
     // 解析 platformID
     record._platform = PlatformIDMap[record.platformID] || 'unknown'
     record._name = NameIDMap[record.nameID] || 'unknown'
@@ -192,7 +30,7 @@ export function parseNameStringInPlace(data: Buffer, record: NameRecord) {
         case 0:
             // Unicode platform
             record._encoding = UnicodeEncodingIDMap[record.encodingID] || 'unknown'
-            record._value = decodeBufferUtf16BE(data)
+            record._value = data.toString("utf16be")
             break
         case 1:
             // Macintosh platform
@@ -204,7 +42,7 @@ export function parseNameStringInPlace(data: Buffer, record: NameRecord) {
             // Windows platform
             record._encoding = WindowsEncodingIDMap[record.encodingID] || 'unknown'
             record._language = WindowsLanguageIDMap[('0'.repeat(4)+record.languageID.toString(16)).slice(-4)] || 'unknown'
-            record._value = decodeBufferUtf16BE(data)
+            record._value = data.toString("utf16be")
             break
         default:
             record._value = data.toString('ascii')
@@ -213,34 +51,21 @@ export function parseNameStringInPlace(data: Buffer, record: NameRecord) {
 }
 
 /**
- * 以 UTF-16BE 的方式解码数据
- * @param data
- */
-function decodeBufferUtf16BE(data: Buffer): string {
-    const buf = Buffer.from(new Uint8Array(data.length))
-    for (let i = 0, len = data.length / 2; i < len; i++) {
-        const val = data.readUInt16BE(i*2)
-        buf.writeUInt16BE((val>>8) | (val<<8 & 0xFFFF), i*2)
-    }
-    return buf.toString('utf16le')
-}
-
-/**
  * 解析 'glyf' 表中的字型数据
  * @param file
  * @param numberOfContours 该字型的轮廓数
  * @param glyfLen
  */
-export function parseGlyfData(file: Buffer, numberOfContours: number, glyfLen: number): SimpleGlyfData | CompoundGlyfData {
+export function parseGlyfData(file: IFileBuffer, numberOfContours: number, glyfLen: number): SimpleGlyfData | CompoundGlyfData {
     if (numberOfContours >= 0) {
         const endPtsOfContours: number[] = []
         for (let i = 0; i < numberOfContours; i++) {
-            endPtsOfContours.push(readUInt16BE(file))
+            endPtsOfContours.push(file.readUInt16BE())
         }
         // console.log(endPtsOfContours)
 
-        const instructionLength = readUInt16BE(file)
-        const instructions = readBuffer(file, instructionLength)
+        const instructionLength = file.readUInt16BE()
+        const instructions = file.readBuffer(instructionLength)
         // console.log('instructionLength: ', instructionLength)
 
         // const flags = []
@@ -248,12 +73,12 @@ export function parseGlyfData(file: Buffer, numberOfContours: number, glyfLen: n
         // for (let i = 0; i < numberOfContours; i++) {
         //     let j = 0
         //     do {
-        //         const flag = parseGlyfFlag(readUInt8(file), flagIdx++)
+        //         const flag = parseGlyfFlag(file.readUInt8(), flagIdx++)
         //         j++
         //         flags.push(flag)
         //
         //         if (flag.repeat) {
-        //             const repeatCount = readUInt8(file)
+        //             const repeatCount = file.readUInt8()
         //             flag._repeat = repeatCount
         //
         //             j += repeatCount
@@ -278,18 +103,18 @@ export function parseGlyfData(file: Buffer, numberOfContours: number, glyfLen: n
         // flags.forEach(flag => {
         //     let xCoord
         //     if (flag.xShortVector) {
-        //         xCoord = readUInt8(file)
+        //         xCoord = file.readUInt8()
         //     } else {
-        //         xCoord = readInt16BE(file)
+        //         xCoord = file.readInt16BE()
         //     }
         //     xCoordinates.push(xCoord)
         // })
         // flags.forEach(flag => {
         //     let yCoord
         //     if (flag.yShortVector) {
-        //         yCoord = readUInt8(file)
+        //         yCoord = file.readUInt8()
         //     } else {
-        //         yCoord = readInt16BE(file)
+        //         yCoord = file.readInt16BE()
         //     }
         //     yCoordinates.push(yCoord)
         // })
@@ -298,10 +123,10 @@ export function parseGlyfData(file: Buffer, numberOfContours: number, glyfLen: n
             endPtsOfContours,
             instructionLength,
             instructions,
-            remind: readBuffer(file, glyfLen - 2*numberOfContours-2-instructionLength),
+            remind: file.readBuffer(glyfLen - 2*numberOfContours-2-instructionLength),
         }
     } else {
-        return readBuffer(file, glyfLen)
+        return file.readBuffer(glyfLen)
     }
 }
 
@@ -326,7 +151,7 @@ function parseGlyfFlag(bits: number, index: number): GlyfFlag {
  * @param tableDesc
  * @param subtables
  */
-export function parseCmapSubtablesInPlace(file: Buffer, tableDesc: DirectoryEntry, subtables: CmapEncodingSubtable[]) {
+export function parseCmapSubtablesInPlace(file: IFileBuffer, tableDesc: DirectoryEntry, subtables: CmapEncodingSubtable[]) {
     subtables.forEach(subtable => {
         const { platformID, encodingID, offset } = subtable
 
@@ -346,9 +171,9 @@ export function parseCmapSubtablesInPlace(file: Buffer, tableDesc: DirectoryEntr
                 break
         }
 
-        setFileOffset(tableDesc.offset + offset)
+        file.setFileOffset(tableDesc.offset + offset)
 
-        subtable.format = readUInt16BE(file)
+        subtable.format = file.readUInt16BE()
         switch (subtable.format) {
             case 0:
                 parseCmapFormat0(file, subtable)
@@ -399,12 +224,12 @@ export function resolveCmapSubtable(subtables: CmapEncodingSubtable[]): number {
 /**
  * 解析 cmap format-0
  */
-function parseCmapFormat0(file: Buffer, subtable: CmapEncodingSubtable) {
-    const length = readUInt16BE(file)
-    const language = readInt16BE(file)
+function parseCmapFormat0(file: IFileBuffer, subtable: CmapEncodingSubtable) {
+    const length = file.readUInt16BE()
+    const language = file.readInt16BE()
     const glyphIndexArray = Array.from<number>({length: 256})
     for (let i = 0; i < 256; i++) {
-        glyphIndexArray[i] = readUInt8(file)
+        glyphIndexArray[i] = file.readUInt8()
     }
 
     subtable._data = {
@@ -426,42 +251,42 @@ function parseCmapFormat0(file: Buffer, subtable: CmapEncodingSubtable) {
  * @param file
  * @param subtable
  */
-function parseCmapFormat4(file: Buffer, subtable: CmapEncodingSubtable) {
-    const length = readUInt16BE(file)
-    const language = readUInt16BE(file)
-    const segCountX2 = readUInt16BE(file)
-    const searchRange = readUInt16BE(file)
-    const entrySelector = readUInt16BE(file)
-    const rangeShift = readUInt16BE(file)
+function parseCmapFormat4(file: IFileBuffer, subtable: CmapEncodingSubtable) {
+    const length = file.readUInt16BE()
+    const language = file.readUInt16BE()
+    const segCountX2 = file.readUInt16BE()
+    const searchRange = file.readUInt16BE()
+    const entrySelector = file.readUInt16BE()
+    const rangeShift = file.readUInt16BE()
     const segCount = segCountX2 / 2
 
     const endCode = Array.from<number>({length: segCount})
     for (let i = 0; i < segCount; i++) {
-        endCode[i] = readUInt16BE(file)
+        endCode[i] = file.readUInt16BE()
     }
 
-    const reservedPad = readUInt16BE(file)
+    const reservedPad = file.readUInt16BE()
 
     const startCode = Array.from<number>({length: segCount})
     for (let i = 0; i < segCount; i++) {
-        startCode[i] = readUInt16BE(file)
+        startCode[i] = file.readUInt16BE()
     }
 
     const idDelta = Array.from<number>({length: segCount})
     for (let i = 0; i < segCount; i++) {
-        idDelta[i] = readUInt16BE(file)
+        idDelta[i] = file.readUInt16BE()
     }
 
-    const idRangeOffsetStart = getFileOffset()
+    const idRangeOffsetStart = file.getFileOffset()
     const idRangeOffset = Array.from<number>({length: segCount})
     for (let i = 0; i < segCount; i++) {
-        idRangeOffset[i] = readUInt16BE(file)
+        idRangeOffset[i] = file.readUInt16BE()
     }
 
     // const glyphIndexArrayLength = length - 22 - segCount * 8
     // const glyphIndexArray = Array.from<number>({length: glyphIndexArrayLength})
     // for (let i = 0; i < glyphIndexArrayLength; i++) {
-    //     glyphIndexArray[i] = readUInt16BE(file)
+    //     glyphIndexArray[i] = file.readUInt16BE()
     // }
 
     subtable._data = {
@@ -496,8 +321,8 @@ function parseCmapFormat4(file: Buffer, subtable: CmapEncodingSubtable) {
             } else {
                 // 需要使用 glyphIndexArray 来确定最终的 glyphIndex
                 const glyphIndexOffset = (idRangeOffsetStart + 2 * segId) + idRangeOffset[segId] + (code - startCode[segId]) * 2
-                setFileOffset(glyphIndexOffset)
-                return readUInt16BE(file)
+                file.setFileOffset(glyphIndexOffset)
+                return file.readUInt16BE()
             }
         },
     }
@@ -508,17 +333,17 @@ function parseCmapFormat4(file: Buffer, subtable: CmapEncodingSubtable) {
  * @param file
  * @param subtable
  */
-function parseCmapFormat12(file: Buffer, subtable: CmapEncodingSubtable) {
-    const reserved = readUInt16BE(file)
-    const length = readUInt32BE(file)
-    const language = readUInt32BE(file)
-    const nGroups = readUInt32BE(file)
+function parseCmapFormat12(file: IFileBuffer, subtable: CmapEncodingSubtable) {
+    const reserved = file.readUInt16BE()
+    const length = file.readUInt32BE()
+    const language = file.readUInt32BE()
+    const nGroups = file.readUInt32BE()
 
     const groups: CmapFormat12Group[] = []
     for (let i = 0; i < nGroups; i++) {
-        const startCharCode = readUInt32BE(file)
-        const endCharCode = readUInt32BE(file)
-        const startGlyphCode = readUInt32BE(file)
+        const startCharCode = file.readUInt32BE()
+        const endCharCode = file.readUInt32BE()
+        const startGlyphCode = file.readUInt32BE()
         groups.push({
             startCharCode,
             endCharCode,

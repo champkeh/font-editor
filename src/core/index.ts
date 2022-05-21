@@ -1,12 +1,4 @@
 import {
-    readUInt16BE,
-    readInt16BE,
-    readUInt32BE,
-    readBuffer,
-    getFileOffset,
-    readLongDateTime,
-    readFWord,
-    setFileOffset,
     parseNameStringInPlace,
     parseGlyfData,
     parseCmapSubtablesInPlace
@@ -21,14 +13,15 @@ import {
     MaxpTable, NameRecord, NameTable,
     ParsedFont,
     Tables, TableTagNameMap
-} from "../types/ParsedFont"
+} from "../../types/ParsedFont"
+import {IFileBuffer} from "../adapter/IFileBuffer"
 
 
 /**
  * 解析ttf字体
  * @param file 字体文件内容
  */
-export function parseTtf(file: Buffer): ParsedFont {
+export function parseTtf(file: IFileBuffer): ParsedFont {
     // directory table
     const directory = parseDirectoryTable(file)
 
@@ -45,8 +38,8 @@ export function parseTtf(file: Buffer): ParsedFont {
  * 解析字体的 directory 表
  * @param file
  */
-function parseDirectoryTable(file: Buffer): DirectoryTable {
-    setFileOffset(0)
+function parseDirectoryTable(file: IFileBuffer): DirectoryTable {
+    file.setFileOffset(0)
 
     // directory offset
     const offset = parseDirectoryOffset(file)
@@ -64,16 +57,16 @@ function parseDirectoryTable(file: Buffer): DirectoryTable {
  * 提取 directory offset 子表
  * @param file 字体数据
  */
-function parseDirectoryOffset(file: Buffer): DirectoryOffsetSubTable {
-    const scalerType = readUInt32BE(file)
+function parseDirectoryOffset(file: IFileBuffer): DirectoryOffsetSubTable {
+    const scalerType = file.readUInt32BE()
     if (scalerType !== 0x00010000 && scalerType !== 0x74727565) {
         throw new Error('该字体不是ttf字体')
     }
 
-    const numTables = readUInt16BE(file)
-    const searchRange = readUInt16BE(file)
-    const entrySelector = readUInt16BE(file)
-    const rangeShift = readUInt16BE(file)
+    const numTables = file.readUInt16BE()
+    const searchRange = file.readUInt16BE()
+    const entrySelector = file.readUInt16BE()
+    const rangeShift = file.readUInt16BE()
 
     return {
         scalerType,
@@ -81,7 +74,7 @@ function parseDirectoryOffset(file: Buffer): DirectoryOffsetSubTable {
         searchRange,
         entrySelector,
         rangeShift,
-        _blockSize: getFileOffset(),
+        _blockSize: file.getFileOffset(),
     }
 }
 
@@ -90,20 +83,20 @@ function parseDirectoryOffset(file: Buffer): DirectoryOffsetSubTable {
  * @param file 字体数据
  * @param numTables 表格数
  */
-function parseDirectoryEntries(file: Buffer, numTables: number): DirectoryEntry[] {
+function parseDirectoryEntries(file: IFileBuffer, numTables: number): DirectoryEntry[] {
     const entries: DirectoryEntry[] = []
     for (let i = 0; i < numTables; i++) {
-        let blockStart = getFileOffset()
-        const tag = readBuffer(file, 4).toString("ascii")
-        const checksum = readUInt32BE(file)
-        const offset = readUInt32BE(file)
-        const length = readUInt32BE(file)
+        let blockStart = file.getFileOffset()
+        const tag = file.slice(4).toString("ascii")
+        const checksum = file.readUInt32BE()
+        const offset = file.readUInt32BE()
+        const length = file.readUInt32BE()
         entries.push({
             tag: tag as keyof TableTagNameMap,
             checksum,
             offset,
             length,
-            _blockSize: getFileOffset() - blockStart,
+            _blockSize: file.getFileOffset() - blockStart,
             _pad: (4 - (length % 4)) % 4,
         })
     }
@@ -115,7 +108,7 @@ function parseDirectoryEntries(file: Buffer, numTables: number): DirectoryEntry[
  * @param file 字体文件数据
  * @param directory 表目录
  */
-function parseDataTable(file: Buffer, directory: DirectoryEntry[]): Tables {
+function parseDataTable(file: IFileBuffer, directory: DirectoryEntry[]): Tables {
     const tables: Tables = {}
 
     for (let i = 0; i < directory.length; i++) {
@@ -148,32 +141,32 @@ function parseDataTable(file: Buffer, directory: DirectoryEntry[]): Tables {
  * @param directory 表目录
  * @param tables 已解析的tables
  */
-function parseHheaTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): HheaTable {
+function parseHheaTable(file: IFileBuffer, directory: DirectoryEntry[], tables: Tables): HheaTable {
     const tableDesc = directory.find(table => table.tag === 'hhea')
     if (!tableDesc) {
         throw new Error(`'hhea' 表不存在`)
     }
 
     // 将文件指针指向要解析的表偏移
-    setFileOffset(tableDesc.offset)
+    file.setFileOffset(tableDesc.offset)
 
-    const major = readInt16BE(file)
-    const minor = readInt16BE(file)
+    const major = file.readInt16BE()
+    const minor = file.readInt16BE()
     const version = `${major}.${minor}`
 
-    const ascent = readInt16BE(file)
-    const descent = readInt16BE(file)
-    const lineGap = readInt16BE(file)
-    const advanceWidthMax = readUInt16BE(file)
-    const minLeftSideBearing = readInt16BE(file)
-    const minRightSideBearing = readInt16BE(file)
-    const xMaxExtent = readInt16BE(file)
-    const caretSlopeRise = readInt16BE(file)
-    const caretSlopeRun = readInt16BE(file)
-    const caretOffset = readInt16BE(file)
-    const reserved = readBuffer(file, 8)
-    const metricDataFormat = readInt16BE(file)
-    const numOfLongHorMetrics = readUInt16BE(file)
+    const ascent = file.readInt16BE()
+    const descent = file.readInt16BE()
+    const lineGap = file.readInt16BE()
+    const advanceWidthMax = file.readUInt16BE()
+    const minLeftSideBearing = file.readInt16BE()
+    const minRightSideBearing = file.readInt16BE()
+    const xMaxExtent = file.readInt16BE()
+    const caretSlopeRise = file.readInt16BE()
+    const caretSlopeRun = file.readInt16BE()
+    const caretOffset = file.readInt16BE()
+    const reserved = file.readBuffer(8)
+    const metricDataFormat = file.readInt16BE()
+    const numOfLongHorMetrics = file.readUInt16BE()
 
     return {
         _parsed: true,
@@ -200,38 +193,38 @@ function parseHheaTable(file: Buffer, directory: DirectoryEntry[], tables: Table
  * @param directory 表目录
  * @param tables 已解析的tables
  */
-function parseHeadTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): HeadTable {
+function parseHeadTable(file: IFileBuffer, directory: DirectoryEntry[], tables: Tables): HeadTable {
     const tableDesc = directory.find(table => table.tag === 'head')
     if (!tableDesc) {
         throw new Error(`'head' 表不存在`)
     }
 
     // 将文件指针指向要解析的表偏移
-    setFileOffset(tableDesc.offset)
+    file.setFileOffset(tableDesc.offset)
 
-    const versionMajor = readInt16BE(file)
-    const versionMinor = readInt16BE(file)
+    const versionMajor = file.readInt16BE()
+    const versionMinor = file.readInt16BE()
     const version = `${versionMajor}.${versionMinor}`
 
-    const fontRevisionMajor = readInt16BE(file)
-    const fontRevisionMinor = readInt16BE(file)
+    const fontRevisionMajor = file.readInt16BE()
+    const fontRevisionMinor = file.readInt16BE()
     const fontRevision = `${fontRevisionMajor}.${fontRevisionMinor}`
 
-    const checkSumAdjustment = readUInt32BE(file)
-    const magicNumber = readUInt32BE(file)
-    const flags = readUInt16BE(file)
-    const unitsPerEm = readUInt16BE(file)
-    const created = readLongDateTime(file)
-    const modified = readLongDateTime(file)
-    const xMin = readInt16BE(file)
-    const yMin = readInt16BE(file)
-    const xMax = readInt16BE(file)
-    const yMax = readInt16BE(file)
-    const macStyle = readUInt16BE(file)
-    const lowestRecPPEM = readUInt16BE(file)
-    const fontDirectionHint = readInt16BE(file)
-    const indexToLocFormat = readInt16BE(file) === 0 ? 'short' : 'long'
-    const glyphDataFormat = readInt16BE(file)
+    const checkSumAdjustment = file.readUInt32BE()
+    const magicNumber = file.readUInt32BE()
+    const flags = file.readUInt16BE()
+    const unitsPerEm = file.readUInt16BE()
+    const created = file.readLongDateTime()
+    const modified = file.readLongDateTime()
+    const xMin = file.readInt16BE()
+    const yMin = file.readInt16BE()
+    const xMax = file.readInt16BE()
+    const yMax = file.readInt16BE()
+    const macStyle = file.readUInt16BE()
+    const lowestRecPPEM = file.readUInt16BE()
+    const fontDirectionHint = file.readInt16BE()
+    const indexToLocFormat = file.readInt16BE() === 0 ? 'short' : 'long'
+    const glyphDataFormat = file.readInt16BE()
 
     return {
         _parsed: true,
@@ -261,33 +254,33 @@ function parseHeadTable(file: Buffer, directory: DirectoryEntry[], tables: Table
  * @param directory 表目录
  * @param tables 已解析的tables
  */
-function parseMaxpTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): MaxpTable {
+function parseMaxpTable(file: IFileBuffer, directory: DirectoryEntry[], tables: Tables): MaxpTable {
     const tableDesc = directory.find(table => table.tag === 'maxp')
     if (!tableDesc) {
         throw new Error(`'maxp' 表不存在`)
     }
 
     // 将文件指针指向要解析的表偏移
-    setFileOffset(tableDesc.offset)
+    file.setFileOffset(tableDesc.offset)
 
-    const major = readInt16BE(file)
-    const minor = readInt16BE(file)
+    const major = file.readInt16BE()
+    const minor = file.readInt16BE()
     const version = `${major}.${minor}`
 
-    const numGlyphs = readUInt16BE(file)
-    const maxPoints = readUInt16BE(file)
-    const maxContours = readUInt16BE(file)
-    const maxComponentPoints = readUInt16BE(file)
-    const maxComponentContours = readUInt16BE(file)
-    const maxZones = readUInt16BE(file)
-    const maxTwilightPoints = readUInt16BE(file)
-    const maxStorage = readUInt16BE(file)
-    const maxFunctionDefs = readUInt16BE(file)
-    const maxInstructionDefs = readUInt16BE(file)
-    const maxStackElements = readUInt16BE(file)
-    const maxSizeOfInstructions = readUInt16BE(file)
-    const maxComponentElements = readUInt16BE(file)
-    const maxComponentDepth = readUInt16BE(file)
+    const numGlyphs = file.readUInt16BE()
+    const maxPoints = file.readUInt16BE()
+    const maxContours = file.readUInt16BE()
+    const maxComponentPoints = file.readUInt16BE()
+    const maxComponentContours = file.readUInt16BE()
+    const maxZones = file.readUInt16BE()
+    const maxTwilightPoints = file.readUInt16BE()
+    const maxStorage = file.readUInt16BE()
+    const maxFunctionDefs = file.readUInt16BE()
+    const maxInstructionDefs = file.readUInt16BE()
+    const maxStackElements = file.readUInt16BE()
+    const maxSizeOfInstructions = file.readUInt16BE()
+    const maxComponentElements = file.readUInt16BE()
+    const maxComponentDepth = file.readUInt16BE()
 
     return {
         _parsed: true,
@@ -315,7 +308,7 @@ function parseMaxpTable(file: Buffer, directory: DirectoryEntry[], tables: Table
  * @param directory 表目录
  * @param tables 已解析的tables
  */
-function parseLocaTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): LocaTable {
+function parseLocaTable(file: IFileBuffer, directory: DirectoryEntry[], tables: Tables): LocaTable {
     const tableDesc = directory.find(table => table.tag === 'loca')
     if (!tableDesc) {
         throw new Error(`'loca' 表不存在`)
@@ -330,7 +323,7 @@ function parseLocaTable(file: Buffer, directory: DirectoryEntry[], tables: Table
     }
 
     // 将文件指针指向要解析的表偏移
-    setFileOffset(tableDesc.offset)
+    file.setFileOffset(tableDesc.offset)
 
     const locas: LocaEntry[] = []
 
@@ -339,9 +332,9 @@ function parseLocaTable(file: Buffer, directory: DirectoryEntry[], tables: Table
     for (let i = 0; i < numGlyphs + 1; i++) {
         let currentGlyphsOffset = 0
         if (tables.head.indexToLocFormat === 'short') {
-            currentGlyphsOffset = readUInt16BE(file) * 2
+            currentGlyphsOffset = file.readUInt16BE() * 2
         } else {
-            currentGlyphsOffset = readUInt32BE(file)
+            currentGlyphsOffset = file.readUInt32BE()
         }
 
         if (i > 0) {
@@ -365,7 +358,7 @@ function parseLocaTable(file: Buffer, directory: DirectoryEntry[], tables: Table
  * @param directory 表目录
  * @param tables 已解析的tables
  */
-function parseHmtxTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): HmtxTable {
+function parseHmtxTable(file: IFileBuffer, directory: DirectoryEntry[], tables: Tables): HmtxTable {
     const tableDesc = directory.find(table => table.tag === 'hmtx')
     if (!tableDesc) {
         throw new Error(`'hmtx' 表不存在`)
@@ -377,7 +370,7 @@ function parseHmtxTable(file: Buffer, directory: DirectoryEntry[], tables: Table
     }
 
     // 将文件指针指向要解析的表偏移
-    setFileOffset(tableDesc.offset)
+    file.setFileOffset(tableDesc.offset)
 
     const numOfLongHorMetrics = tables.hhea.numOfLongHorMetrics
 
@@ -386,8 +379,8 @@ function parseHmtxTable(file: Buffer, directory: DirectoryEntry[], tables: Table
         hMetrics: []
     }
     for (let i = 0; i < numOfLongHorMetrics; i++) {
-        const advanceWidth = readUInt16BE(file)
-        const leftSideBearing = readInt16BE(file)
+        const advanceWidth = file.readUInt16BE()
+        const leftSideBearing = file.readInt16BE()
         hmtxTable.hMetrics.push({advanceWidth, leftSideBearing})
     }
 
@@ -395,7 +388,7 @@ function parseHmtxTable(file: Buffer, directory: DirectoryEntry[], tables: Table
     if (numOfLeftSideBearing > 0) {
         hmtxTable.leftSideBearing = []
         for (let i = 0; i < numOfLeftSideBearing; i++) {
-            hmtxTable.leftSideBearing.push(readFWord(file))
+            hmtxTable.leftSideBearing.push(file.readFWord())
         }
     }
 
@@ -409,27 +402,27 @@ function parseHmtxTable(file: Buffer, directory: DirectoryEntry[], tables: Table
  * @param directory 表目录
  * @param tables 已解析的tables
  */
-function parseNameTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): NameTable {
+function parseNameTable(file: IFileBuffer, directory: DirectoryEntry[], tables: Tables): NameTable {
     const tableDesc = directory.find(table => table.tag === 'name')
     if (!tableDesc) {
         throw new Error(`'name' 表不存在`)
     }
 
     // 将文件指针指向要解析的表偏移
-    setFileOffset(tableDesc.offset)
+    file.setFileOffset(tableDesc.offset)
 
-    const format = readUInt16BE(file)
-    const count = readUInt16BE(file)
-    const stringOffset = readUInt16BE(file)
+    const format = file.readUInt16BE()
+    const count = file.readUInt16BE()
+    const stringOffset = file.readUInt16BE()
 
     const nameRecord: NameRecord[] = []
     for (let i = 0; i < count; i++) {
-        const platformID = readUInt16BE(file)
-        const encodingID = readUInt16BE(file)
-        const languageID = readUInt16BE(file)
-        const nameID = readUInt16BE(file)
-        const length = readUInt16BE(file)
-        const offset = readUInt16BE(file)
+        const platformID = file.readUInt16BE()
+        const encodingID = file.readUInt16BE()
+        const languageID = file.readUInt16BE()
+        const nameID = file.readUInt16BE()
+        const length = file.readUInt16BE()
+        const offset = file.readUInt16BE()
         nameRecord.push({
             platformID,
             encodingID,
@@ -448,8 +441,8 @@ function parseNameTable(file: Buffer, directory: DirectoryEntry[], tables: Table
     for (let i = 0; i < count; i++) {
         const record = nameRecord[i]
 
-        setFileOffset(tableDesc.offset + stringOffset + record.offset)
-        const nameBuf = readBuffer(file, record.length)
+        file.setFileOffset(tableDesc.offset + stringOffset + record.offset)
+        const nameBuf = file.slice(record.length)
         parseNameStringInPlace(nameBuf, record)
     }
 
@@ -468,7 +461,7 @@ function parseNameTable(file: Buffer, directory: DirectoryEntry[], tables: Table
  * @param directory 表目录
  * @param tables 已解析的tables
  */
-function parseGlyfTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): GlyfTable {
+function parseGlyfTable(file: IFileBuffer, directory: DirectoryEntry[], tables: Tables): GlyfTable {
     const tableDesc = directory.find(table => table.tag === 'glyf')
     if (!tableDesc) {
         throw new Error(`'glyf' 表不存在`)
@@ -480,7 +473,7 @@ function parseGlyfTable(file: Buffer, directory: DirectoryEntry[], tables: Table
     }
 
     // 将文件指针指向要解析的表偏移
-    setFileOffset(tableDesc.offset)
+    file.setFileOffset(tableDesc.offset)
 
     tables.loca.entries.sort((a, b) => a._index > b._index ? 1 : -1)
 
@@ -494,11 +487,11 @@ function parseGlyfTable(file: Buffer, directory: DirectoryEntry[], tables: Table
             })
             return
         }
-        const numberOfContours = readInt16BE(file)
-        const xMin = readFWord(file)
-        const yMin = readFWord(file)
-        const xMax = readFWord(file)
-        const yMax = readFWord(file)
+        const numberOfContours = file.readInt16BE()
+        const xMin = file.readFWord()
+        const yMin = file.readFWord()
+        const xMax = file.readFWord()
+        const yMax = file.readFWord()
         // const buf = readBuffer(file, loca._length - 10)
         const buf = parseGlyfData(file, numberOfContours, loca._length - 10)
         glyfDefs.push({
@@ -526,23 +519,23 @@ function parseGlyfTable(file: Buffer, directory: DirectoryEntry[], tables: Table
  * @param directory 表目录
  * @param tables 已解析的tables
  */
-function parseCmapTable(file: Buffer, directory: DirectoryEntry[], tables: Tables): CmapTable {
+function parseCmapTable(file: IFileBuffer, directory: DirectoryEntry[], tables: Tables): CmapTable {
     const tableDesc = directory.find(table => table.tag === 'cmap')
     if (!tableDesc) {
         throw new Error(`'cmap' 表不存在`)
     }
 
     // 将文件指针指向要解析的表偏移
-    setFileOffset(tableDesc.offset)
+    file.setFileOffset(tableDesc.offset)
 
-    const version = readUInt16BE(file)
-    const numberSubtables = readUInt16BE(file)
+    const version = file.readUInt16BE()
+    const numberSubtables = file.readUInt16BE()
 
     const subtables: CmapEncodingSubtable[] = []
     for (let i = 0; i < numberSubtables; i++) {
-        const platformID = readUInt16BE(file)
-        const encodingID = readUInt16BE(file)
-        const offset = readUInt32BE(file)
+        const platformID = file.readUInt16BE()
+        const encodingID = file.readUInt16BE()
+        const offset = file.readUInt32BE()
         subtables.push({
             platformID,
             encodingID,
