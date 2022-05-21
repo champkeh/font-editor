@@ -6,15 +6,24 @@ import {
 import {
     CmapEncodingSubtable,
     CmapTable,
-    DirectoryEntry, DirectoryOffsetSubTable, DirectoryTable, GlyfDef, GlyfTable,
+    DirectoryEntry,
+    DirectoryOffsetSubTable,
+    DirectoryTable,
+    GlyfDef,
+    GlyfTable,
     HeadTable,
-    HheaTable, HmtxTable, LocaEntry,
+    HheaTable,
+    HmtxTable,
+    LocaEntry,
     LocaTable,
-    MaxpTable, NameRecord, NameTable,
+    MaxpTable,
+    NameRecord,
+    NameTable,
     ParsedFont,
-    Tables, TableTagNameMap
-} from "../../types/ParsedFont"
-import {IFileBuffer} from "../adapter/IFileBuffer"
+    Tables,
+    TableTagNameMap
+} from "../types"
+import {IFileBuffer} from "../IFileBuffer"
 
 
 /**

@@ -24,7 +24,7 @@ interface BaseTable {
     _parsed: boolean
 }
 
-interface TableTagNameMap {
+export interface TableTagNameMap {
     "hhea": HheaTable
     "head": HeadTable
     "maxp": MaxpTable

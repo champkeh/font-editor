@@ -1,4 +1,4 @@
-import {IFileBuffer} from "./IFileBuffer"
+import {IFileBuffer} from "../IFileBuffer"
 import {addSeconds2Date} from "../shared/utils"
 
 export class FileBuffer implements IFileBuffer {
@@ -97,11 +97,11 @@ export class FileBuffer implements IFileBuffer {
     toString(encoding: "ascii" | "utf16le" | "utf16be"): string {
         switch (encoding) {
             case "ascii":
-                return ""
+                return new TextDecoder("ascii").decode(this.file)
             case "utf16le":
-                return ""
+                return new TextDecoder("utf-16le").decode(this.file)
             case "utf16be":
-                return ""
+                return new TextDecoder("utf-16be").decode(this.file)
             default:
                 throw new Error(`unsupported encoding: "${encoding}".`)
         }

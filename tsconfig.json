@@ -1,16 +1,16 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
+    "target": "ES2015",
     "module": "ESNext",
     "moduleResolution": "node",
     "noEmitOnError": true,
     "declaration": true,
-    "declarationDir": "dist/types",
+    "declarationDir": "typings",
     "esModuleInterop": true,
-    "strict": true
+    "strict": true,
+    "rootDir": "src",
   },
   "include": [
     "src/**/*.ts",
-    "types/**/*.d.ts"
   ]
 }

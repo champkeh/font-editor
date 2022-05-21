@@ -1,19 +1,22 @@
 import {
-    CmapEncodingSubtable, CmapFormat12Group,
+    CmapEncodingSubtable,
+    CmapFormat12Group,
     CompoundGlyfData,
     DirectoryEntry,
     GlyfFlag,
     NameRecord,
     SimpleGlyfData
-} from "../../types/ParsedFont"
+} from "../types"
 import {
     UnicodeEncodingIDMap,
     MacintoshEncodingIDMap,
     WindowsEncodingIDMap,
     PlatformIDMap,
-    WindowsLanguageIDMap, MacintoshLanguageIDMap, NameIDMap
+    WindowsLanguageIDMap,
+    MacintoshLanguageIDMap,
+    NameIDMap
 } from './map'
-import {IFileBuffer} from "../adapter/IFileBuffer";
+import {IFileBuffer} from "../IFileBuffer"
 
 
 /**

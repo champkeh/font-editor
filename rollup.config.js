@@ -3,6 +3,7 @@ import resolve from '@rollup/plugin-node-resolve'
 import babel from "@rollup/plugin-babel"
 import pkg from './package.json'
 
+
 const extensions = [
     '.js',
     '.jsx',
@@ -10,51 +11,31 @@ const extensions = [
     '.tsx'
 ]
 
-export default defineConfig([
-        {
-            input: 'src/entry/entry-cjs.ts',
+export default defineConfig({
+        input: 'src/index.ts',
+        plugins: [
+            resolve({extensions}),
+            babel({
+                extensions,
+                babelHelpers: 'bundled',
+                include: ['src/**/*']
+            }),
+        ],
 
-            external: [],
-
-            plugins: [
-                resolve({ extensions }),
-                babel({
-                    extensions,
-                    babelHelpers: 'bundled',
-                    include: ['src/**/*']
-                }),
-            ],
-
-            output: {
+        output: [
+            {
                 file: pkg.main,
                 format: 'cjs'
             },
-        },
-        {
-            input: 'src/entry/entry-es.ts',
-
-            external: [],
-
-            plugins: [
-                resolve({ extensions }),
-                babel({
-                    extensions,
-                    babelHelpers: 'bundled',
-                    include: ['src/**/*']
-                }),
-            ],
-
-            output: [
-                {
-                    file: pkg.module,
-                    format: 'es'
-                },
-                {
-                    file: pkg.browser,
-                    format: 'iife',
-                    name: 'FontEditor'
-                }
-            ],
-        }
-    ]
+            {
+                file: pkg.module,
+                format: 'es'
+            },
+            {
+                file: pkg.browser,
+                format: 'iife',
+                name: 'FontEditor'
+            }
+        ],
+    }
 )

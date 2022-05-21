@@ -7,21 +7,6 @@
 <body>
 <input id="file" type="file">
 
-<script type="module">
-    import {FileBuffer} from '../../dist/browser.js'
-    import {parseTtf} from '../../dist/core/index.js'
-
-    document.getElementById('file').addEventListener('change', (evt) => {
-        const file = evt.target.files[0]
-        const reader = new FileReader()
-        reader.onload = function (evt) {
-            const buffer = evt.target.result
-            const file = new FileBuffer(buffer)
-            const result = parseTtf(file)
-            console.log(result)
-        }
-        reader.readAsArrayBuffer(file)
-    })
-</script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

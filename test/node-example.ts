@@ -1,7 +1,7 @@
 import path from "path"
 import fs, {PathLike} from 'fs'
-import {FileBuffer} from "./adapter/node"
-import {parseTtf} from "./core"
+import {FileBuffer} from "../src/core/file_buffer"
+import {parseTtf} from "../src"
 
 /**
  * 读取文件内容
